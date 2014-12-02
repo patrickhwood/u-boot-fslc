@@ -202,7 +202,7 @@ static int ksz9031_phy_extwrite(struct phy_device *phydev, int addr,
 
 static struct phy_driver ksz9031_driver = {
 	.name = "Micrel ksz9031",
-	.uid  = 0x221620,
+	.uid  = 0xFFFFF0,
 	.mask = 0xfffff0,
 	.features = PHY_GBIT_FEATURES,
 	.config   = &genphy_config,

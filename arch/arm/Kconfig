@@ -402,6 +402,9 @@ config TARGET_MX6QSABREAUTO
 config TARGET_MX6SABRESD
 	bool "Support mx6sabresd"
 
+config TARGET_MX6UIB
+	bool "Support mx6uib"
+
 config TARGET_MX6SLEVK
 	bool "Support mx6slevk"
 
@@ -635,6 +638,7 @@ source "board/freescale/mx6qsabreauto/Kconfig"
 source "board/freescale/mx6sabresd/Kconfig"
 source "board/freescale/mx6slevk/Kconfig"
 source "board/freescale/mx6sxsabresd/Kconfig"
+source "board/freescale/mx6uib/Kconfig"
 source "board/freescale/vf610twr/Kconfig"
 source "board/gateworks/gw_ventana/Kconfig"
 source "board/genesi/mx51_efikamx/Kconfig"

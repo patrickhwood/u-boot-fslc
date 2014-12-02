@@ -289,7 +289,7 @@ int genphy_parse_link(struct phy_device *phydev)
 			 */
 			gblpa = phy_read(phydev, MDIO_DEVAD_NONE, MII_STAT1000);
 			if (gblpa < 0) {
-				debug("Could not read MII_STAT1000. Ignoring gigabit capability\n");
+				printf("Could not read MII_STAT1000. Ignoring gigabit capability\n");
 				gblpa = 0;
 			}
 			gblpa &= phy_read(phydev,
@@ -522,11 +522,13 @@ static struct phy_driver *get_phy_driver(struct phy_device *phydev,
 
 	list_for_each(entry, &phy_drivers) {
 		drv = list_entry(entry, struct phy_driver, list);
+		printf("get_phy_driver... drv->uid = %x, phy_id = %x\n", drv->uid, phy_id);
 		if ((drv->uid & drv->mask) == (phy_id & drv->mask))
 			return drv;
 	}
 
 	/* If we made it here, there's no driver for this PHY */
+	printf("get_phy_driver... return generic interface\n");
 	return generic_for_interface(interface);
 }
 
@@ -558,6 +560,7 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
 	dev->bus = bus;
 
 	dev->drv = get_phy_driver(dev, interface);
+	printf("phy_device_create... addr = %x, uid = %x\n", addr, dev->drv->uid);
 
 	phy_probe(dev);
 
@@ -684,14 +687,14 @@ int phy_reset(struct phy_device *phydev)
 
 	reg = phy_read(phydev, devad, MII_BMCR);
 	if (reg < 0) {
-		debug("PHY status read failed\n");
+		printf("PHY status read failed\n");
 		return -1;
 	}
 
 	reg |= BMCR_RESET;
 
 	if (phy_write(phydev, devad, MII_BMCR, reg) < 0) {
-		debug("PHY reset failed\n");
+		printf("PHY reset failed\n");
 		return -1;
 	}
 
@@ -707,7 +710,7 @@ int phy_reset(struct phy_device *phydev)
 		reg = phy_read(phydev, devad, MII_BMCR);
 
 		if (reg < 0) {
-			debug("PHY status read failed\n");
+			printf("PHY status read failed\n");
 			return -1;
 		}
 		udelay(1000);
@@ -758,7 +761,7 @@ void phy_connect_dev(struct phy_device *phydev, struct eth_device *dev)
 				phydev->dev->name, dev->name);
 	}
 	phydev->dev = dev;
-	debug("%s connected to %s\n", dev->name, phydev->drv->name);
+	printf("%s connected to %s\n", dev->name, phydev->drv->name);
 }
 
 struct phy_device *phy_connect(struct mii_dev *bus, int addr,

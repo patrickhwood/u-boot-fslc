@@ -1,0 +1,6 @@
+MX6UIB BOARD
+M:	Pat Wood <pat.wood@efi.com>
+S:	Maintained
+F:	board/freescale/mx6uib/
+F:	include/configs/mx6uib.h
+F:	configs/mx6dluib_defconfig
