@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2012 Freescale Semiconductor, Inc.
  *
- * Configuration settings for the Freescale i.MX6Q SabreSD board.
+ * Configuration settings for the i.MX6DL UIB board.
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -17,7 +17,7 @@
 #define CONFIG_CONSOLE_DEV		"ttymxc0"
 #define CONFIG_MMCROOT			"/dev/mmcblk0p2"
 #if defined(CONFIG_MX6Q)
-#define CONFIG_DEFAULT_FDT_FILE	"imx6q-sabresd-ldo.dtb"
+#define CONFIG_DEFAULT_FDT_FILE	"imx6q-sabresd.dtb"
 #elif defined(CONFIG_MX6DL)
 #define CONFIG_DEFAULT_FDT_FILE	"imx6dl-sabresd.dtb"
 #endif
