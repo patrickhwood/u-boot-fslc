@@ -47,6 +47,16 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm | PAD_CTL_HYS |	\
 	PAD_CTL_ODE | PAD_CTL_SRE_FAST)
 
+#define WEAK_PULLUP	(PAD_CTL_PUS_100K_UP |			\
+	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm | PAD_CTL_HYS |	\
+	PAD_CTL_SRE_SLOW)
+
+#define WEAK_PULLDOWN	(PAD_CTL_PUS_100K_DOWN |		\
+	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm |			\
+	PAD_CTL_HYS | PAD_CTL_SRE_SLOW)
+
+#define OUTPUT_40OHM (PAD_CTL_SPEED_MED|PAD_CTL_DSE_40ohm)
+
 #define I2C_PMIC	1
 
 #define I2C_PAD MUX_PAD_CTRL(I2C_PAD_CTRL)
@@ -139,6 +149,18 @@ iomux_v3_cfg_t nfc_pads[] = {
 	MX6_PAD_NANDF_D7__NAND_DATA07		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_SD4_DAT0__NAND_DQS		| MUX_PAD_CTRL(NO_PAD_CTRL),
 };
+
+#ifdef CONFIG_USB_EHCI_MX6
+
+#define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
+
+iomux_v3_cfg_t const usb_pads[] = {
+	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLDOWN),
+	MX6_PAD_KEY_COL4__USB_OTG_OC	| MUX_PAD_CTRL(WEAK_PULLUP),
+	/* OTG Power enable */
+	MX6_PAD_EIM_D22__USB_OTG_PWR		| MUX_PAD_CTRL(OUTPUT_40OHM),
+};
+#endif
 
 static void setup_gpmi_nand(void)
 {
@@ -233,6 +255,18 @@ static void setup_iomux_uart(void)
 {
 	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 }
+
+#ifdef CONFIG_USB_EHCI_MX6
+int board_ehci_power(int port, int on)
+{
+	printf("board_ehci_power %d %d\n", port, on);
+	if (port)
+		return 0;
+	gpio_set_value(GP_USB_OTG_PWR, on);
+	return 0;
+}
+
+#endif
 
 #ifdef CONFIG_FSL_ESDHC
 struct fsl_esdhc_cfg usdhc_cfg[2] = {
@@ -487,8 +521,18 @@ int board_early_init_f(void)
 
 int board_init(void)
 {
+
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
+
+#ifdef CONFIG_USB_EHCI_MX6
+	/* struct iomuxc *const iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
+	clrsetbits_le32(&iomuxc_regs->gpr[1],
+			IOMUXC_GPR1_OTG_ID_MASK,
+			IOMUXC_GPR1_OTG_ID_GPIO1); */
+
+	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
+#endif
 
 #ifdef CONFIG_MXC_SPI
 	setup_spi();

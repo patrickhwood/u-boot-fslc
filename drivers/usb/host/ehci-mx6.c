@@ -120,6 +120,7 @@ static int usb_phy_enable(int index, struct usb_ehci *ehci)
 	void __iomem *phy_ctrl;
 	void __iomem *usb_cmd;
 	u32 val;
+printf("usb_phy_enable: %d\n", index);
 
 	if (index >= ARRAY_SIZE(phy_bases))
 		return 0;
@@ -159,8 +160,11 @@ static int usb_phy_enable(int index, struct usb_ehci *ehci)
 	val = __raw_readl(phy_ctrl);
 	val |= (USBPHY_CTRL_ENUTMILEVEL2 | USBPHY_CTRL_ENUTMILEVEL3);
 	__raw_writel(val, phy_ctrl);
+printf("	val = %x\n", val);
 
-	return val & USBPHY_CTRL_OTG_ID;
+	// @@@ force host mode here -- PHW
+	// return val & USBPHY_CTRL_OTG_ID;
+	return 0;
 }
 
 /* Base address for this IP block is 0x02184800 */
@@ -227,6 +231,7 @@ int ehci_hcd_init(int index, enum usb_init_type init,
 	*hcor = (struct ehci_hcor *)((uint32_t)*hccr +
 			HC_LENGTH(ehci_readl(&(*hccr)->cr_capbase)));
 
+printf("ehci_hcd_init: init = %d, type = %d\n", init, type);
 	if ((type == init) || (type == USB_INIT_DEVICE))
 		board_ehci_power(index, (type == USB_INIT_DEVICE) ? 0 : 1);
 	if (type != init)
