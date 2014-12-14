@@ -128,6 +128,19 @@ iomux_v3_cfg_t const ecspi1_pads[] = {
 	MX6_PAD_KEY_ROW1__GPIO4_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
+#ifdef CONFIG_USB_EHCI_MX6
+
+#define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
+
+iomux_v3_cfg_t const usb_pads[] = {
+	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLDOWN),
+	MX6_PAD_KEY_COL4__USB_OTG_OC	| MUX_PAD_CTRL(WEAK_PULLUP),
+	/* OTG Power enable */
+	MX6_PAD_EIM_D22__USB_OTG_PWR		| MUX_PAD_CTRL(OUTPUT_40OHM),
+};
+#endif
+
+#ifdef CONFIG_NAND_MXS
 iomux_v3_cfg_t nfc_pads[] = {
 	MX6_PAD_NANDF_CLE__NAND_CLE		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_NANDF_ALE__NAND_ALE		| MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -149,18 +162,6 @@ iomux_v3_cfg_t nfc_pads[] = {
 	MX6_PAD_NANDF_D7__NAND_DATA07		| MUX_PAD_CTRL(NO_PAD_CTRL),
 	MX6_PAD_SD4_DAT0__NAND_DQS		| MUX_PAD_CTRL(NO_PAD_CTRL),
 };
-
-#ifdef CONFIG_USB_EHCI_MX6
-
-#define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
-
-iomux_v3_cfg_t const usb_pads[] = {
-	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLDOWN),
-	MX6_PAD_KEY_COL4__USB_OTG_OC	| MUX_PAD_CTRL(WEAK_PULLUP),
-	/* OTG Power enable */
-	MX6_PAD_EIM_D22__USB_OTG_PWR		| MUX_PAD_CTRL(OUTPUT_40OHM),
-};
-#endif
 
 static void setup_gpmi_nand(void)
 {
@@ -190,6 +191,7 @@ static void setup_gpmi_nand(void)
 	/* enable apbh clock gating */
 	setbits_le32(&mxc_ccm->CCGR0, MXC_CCM_CCGR0_APBHDMA_MASK);
 }
+#endif /* CONFIG_NAND_MXS */
 
 static struct i2c_pads_info i2c_pad_info1 = {
 	.scl = {
