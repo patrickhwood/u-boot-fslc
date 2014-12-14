@@ -68,7 +68,7 @@
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_MICREL
 
-#define CONFIG_CMD_SF
+/* #define CONFIG_CMD_SF */
 #ifdef CONFIG_CMD_SF
 #define CONFIG_SPI_FLASH
 #define CONFIG_SPI_FLASH_STMICRO
@@ -78,6 +78,22 @@
 #define CONFIG_SF_DEFAULT_SPEED		20000000
 #define CONFIG_SF_DEFAULT_MODE		SPI_MODE_0
 #endif
+
+/* NAND stuff */
+#define CONFIG_MTD_DEBUG
+#define CONFIG_MTD_DEBUG_VERBOSE	1
+#define CONFIG_CMD_NAND
+#define CONFIG_CMD_NAND_TRIMFFS
+#define CONFIG_NAND_MXS
+#define CONFIG_SYS_MAX_NAND_DEVICE  2
+#define CONFIG_SYS_NAND_BASE        0x40000000
+#define CONFIG_SYS_NAND_5_ADDR_CYCLE
+#define CONFIG_SYS_NAND_ONFI_DETECTION
+
+/* DMA stuff, needed for GPMI/MXS NAND support */
+#define CONFIG_APBH_DMA
+#define CONFIG_APBH_DMA_BURST
+#define CONFIG_APBH_DMA_BURST8
 
 /* allow to overwrite serial and ethaddr */
 #define CONFIG_ENV_OVERWRITE
@@ -131,7 +147,7 @@
 	"initrd_high=0xffffffff\0" \
 	"mmcdev=" __stringify(CONFIG_SYS_MMC_ENV_DEV) "\0" \
 	"mmcpart=1\0" \
-	"mmcroot=" CONFIG_MMCROOT " rw\0" \
+	"mmcroot=" CONFIG_MMCROOT " rootwait rw\0" \
 	"update_sd_firmware=" \
 		"if test ${ip_dyn} = yes; then " \
 			"setenv get_cmd dhcp; " \
@@ -147,7 +163,7 @@
 		"fi\0" \
 	EMMC_ENV	  \
 	"mmcargs=setenv bootargs console=${console},${baudrate} " \
-		"root=${mmcroot} init=/sbin/init runshell\0" \
+		"root=${mmcroot}\0" \
 	"loadbootscript=" \
 		"fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};\0" \
 	"bootscript=echo Running bootscript from mmc ...; " \
