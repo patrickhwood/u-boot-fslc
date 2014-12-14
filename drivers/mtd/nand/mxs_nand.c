@@ -1145,6 +1145,8 @@ int board_nand_init(struct nand_chip *nand)
 	nand->priv = nand_info;
 	nand->options |= NAND_NO_SUBPAGE_WRITE;
 
+	nand->chip_delay = 40;
+
 	nand->cmd_ctrl		= mxs_nand_cmd_ctrl;
 
 	nand->dev_ready		= mxs_nand_device_ready;
