@@ -1105,7 +1105,7 @@ static int __nand_unlock(struct mtd_info *mtd, loff_t ofs,
 	status = chip->waitfunc(mtd, chip);
 	/* See if device thinks it succeeded */
 	if (status & NAND_STATUS_FAIL) {
-		pr_debug("%s: error status = 0x%08x\n",
+		pr_info("%s: error status = 0x%08x\n",
 					__func__, status);
 		ret = -EIO;
 	}
@@ -1146,7 +1146,7 @@ int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 
 	/* Check, if it is write protected */
 	if (nand_check_wp(mtd)) {
-		pr_debug("%s: device is write protected!\n",
+		pr_info("%s: device is write protected!\n",
 					__func__);
 		ret = -EIO;
 		goto out;
@@ -1196,7 +1196,7 @@ int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 
 	/* Check, if it is write protected */
 	if (nand_check_wp(mtd)) {
-		pr_debug("%s: device is write protected!\n",
+		pr_info("%s: device is write protected!\n",
 					__func__);
 		status = MTD_ERASE_FAILED;
 		ret = -EIO;
@@ -1211,7 +1211,7 @@ int nand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 	status = chip->waitfunc(mtd, chip);
 	/* See if device thinks it succeeded */
 	if (status & NAND_STATUS_FAIL) {
-		pr_debug("%s: error status = 0x%08x\n",
+		pr_info("%s: error status = 0x%08x\n",
 					__func__, status);
 		ret = -EIO;
 		goto out;
@@ -1829,8 +1829,11 @@ read_retry:
 	if (ret < 0)
 		return ret;
 
-	if (ecc_fail)
+	if (ecc_fail) {
+		pr_notice("%s: ecc_fail\n",
+			   __func__);
 		return -EBADMSG;
+	}
 
 	return max_bitflips;
 }
@@ -2091,8 +2094,11 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 	if (ret < 0)
 		return ret;
 
-	if (mtd->ecc_stats.failed - stats.failed)
+	if (mtd->ecc_stats.failed - stats.failed) {
+		pr_notice("%s: ecc stats failed: %d\n", mtd->ecc_stats.failed,
+			   __func__);
 		return -EBADMSG;
+	}
 
 	return  mtd->ecc_stats.corrected - stats.corrected ? -EUCLEAN : 0;
 }
