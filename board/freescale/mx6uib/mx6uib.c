@@ -98,6 +98,15 @@ static void setup_iomux_enet(void)
 	imx_iomux_v3_setup_multiple_pads(enet_pads, ARRAY_SIZE(enet_pads));
 }
 
+iomux_v3_cfg_t const usdhc1_pads[] = {
+    MX6_PAD_SD1_CLK__SD1_CLK    | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+    MX6_PAD_SD1_CMD__SD1_CMD    | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+    MX6_PAD_SD1_DAT0__SD1_DATA0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+    MX6_PAD_SD1_DAT1__SD1_DATA1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+    MX6_PAD_SD1_DAT2__SD1_DATA2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+    MX6_PAD_SD1_DAT3__SD1_DATA3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+};
+
 iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_SD2_CLK__SD2_CLK	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD2_CMD__SD2_CMD	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -108,6 +117,7 @@ iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_GPIO_4__GPIO1_IO04 | MUX_PAD_CTRL(NO_PAD_CTRL), /* CD */
 };
 
+/* eMMC */
 iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_CLK__SD3_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_CMD__SD3_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -265,9 +275,10 @@ int board_ehci_power(int port, int on)
 #endif
 
 #ifdef CONFIG_FSL_ESDHC
-struct fsl_esdhc_cfg usdhc_cfg[2] = {
+struct fsl_esdhc_cfg usdhc_cfg[3] = {
 	{USDHC2_BASE_ADDR},
 	{USDHC3_BASE_ADDR},
+	{USDHC1_BASE_ADDR},
 };
 
 #define USDHC2_CD_GPIO  IMX_GPIO_NR(1, 4)
@@ -284,6 +295,9 @@ int board_mmc_getcd(struct mmc *mmc)
 	case USDHC3_BASE_ADDR:
 		ret = 1; /* eMMC/uSDHC3 is always present */
 		break;
+	case USDHC1_BASE_ADDR:
+		ret = 1; /* assume uSDHC1 is always present for now */
+		break;
 	}
 
 	return ret;
@@ -299,6 +313,7 @@ int board_mmc_init(bd_t *bis)
 	 * (U-boot device node)    (Physical Port)
 	 * mmc0                    SD2
 	 * mmc1                    eMMC
+	 * mmc2                    SD1
 	 */
 	for (i = 0; i < CONFIG_SYS_FSL_USDHC_NUM; i++) {
 		switch (i) {
@@ -313,9 +328,14 @@ int board_mmc_init(bd_t *bis)
 				usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
 			usdhc_cfg[1].sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
 			break;
+		case 2:
+			imx_iomux_v3_setup_multiple_pads(
+				usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
+			usdhc_cfg[1].sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
+			break;
 		default:
 			printf("Warning: you configured more USDHC controllers"
-			       "(%d) then supported by the board (%d)\n",
+			       "(%d) than supported by the board (%d)\n",
 			       i + 1, CONFIG_SYS_FSL_USDHC_NUM);
 			return status;
 		}
