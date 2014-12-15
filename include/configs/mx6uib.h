@@ -27,7 +27,7 @@
 
 #include "mx6uib_common.h"
 
-#define CONFIG_SYS_FSL_USDHC_NUM	2
+#define CONFIG_SYS_FSL_USDHC_NUM	3
 #if defined(CONFIG_ENV_IS_IN_MMC)
 #define CONFIG_SYS_MMC_ENV_DEV		0	/* SDHC2 */
 #endif
