@@ -40,9 +40,6 @@ DECLARE_GLOBAL_DATA_PTR;
 #define ENET_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
 	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm | PAD_CTL_HYS)
 
-#define SPI_PAD_CTRL (PAD_CTL_HYS | PAD_CTL_SPEED_MED | \
-		      PAD_CTL_DSE_40ohm | PAD_CTL_SRE_FAST)
-
 #define I2C_PAD_CTRL  (PAD_CTL_PUS_100K_UP |			\
 	PAD_CTL_SPEED_MED | PAD_CTL_DSE_40ohm | PAD_CTL_HYS |	\
 	PAD_CTL_ODE | PAD_CTL_SRE_FAST)
@@ -131,12 +128,6 @@ iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT7__SD3_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
 
-iomux_v3_cfg_t const ecspi1_pads[] = {
-	MX6_PAD_KEY_COL0__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
-	MX6_PAD_KEY_COL1__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
-	MX6_PAD_KEY_ROW0__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
-	MX6_PAD_KEY_ROW1__GPIO4_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
-};
 
 #ifdef CONFIG_USB_EHCI_MX6
 
@@ -242,10 +233,22 @@ static struct i2c_pads_info i2c_pad_info3 = {
 	}
 };
 
+#ifdef CONFIG_MXC_SPI
+#define SPI_PAD_CTRL (PAD_CTL_HYS | PAD_CTL_SPEED_MED | \
+		      PAD_CTL_DSE_40ohm | PAD_CTL_SRE_FAST)
+
+iomux_v3_cfg_t const ecspi1_pads[] = {
+	MX6_PAD_KEY_COL0__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_COL1__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_ROW0__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_ROW1__GPIO4_IO09 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
 static void setup_spi(void)
 {
 	imx_iomux_v3_setup_multiple_pads(ecspi1_pads, ARRAY_SIZE(ecspi1_pads));
 }
+#endif
 
 iomux_v3_cfg_t const pcie_pads[] = {
 	MX6_PAD_EIM_D19__GPIO3_IO19 | MUX_PAD_CTRL(NO_PAD_CTRL),	/* POWER */
