@@ -250,12 +250,18 @@ static void setup_spi(void)
 #endif
 
 iomux_v3_cfg_t const pcie_pads[] = {
+#	define PCIE_RESET_N_GPIO IMX_GPIO_NR(1, 0)
 	MX6_PAD_GPIO_0__GPIO1_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL), /* RESET */
 };
 
 static void setup_pcie(void)
 {
 	imx_iomux_v3_setup_multiple_pads(pcie_pads, ARRAY_SIZE(pcie_pads));
+
+	/* assert reset on PCIe */
+	gpio_direction_output(PCIE_RESET_N_GPIO, 0);
+	udelay(500);
+	gpio_set_value(PCIE_RESET_N_GPIO, 1);
 }
 
 static void setup_iomux_uart(void)
