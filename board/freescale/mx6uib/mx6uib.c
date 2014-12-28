@@ -134,7 +134,6 @@ iomux_v3_cfg_t const usdhc3_pads[] = {
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
 
 iomux_v3_cfg_t const usb_pads[] = {
-	MX6_PAD_GPIO_1__USB_OTG_ID		| MUX_PAD_CTRL(WEAK_PULLDOWN),
 	MX6_PAD_KEY_COL4__USB_OTG_OC	| MUX_PAD_CTRL(WEAK_PULLUP),
 	/* OTG Power enable */
 	MX6_PAD_EIM_D22__USB_OTG_PWR		| MUX_PAD_CTRL(OUTPUT_40OHM),
