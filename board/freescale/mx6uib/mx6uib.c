@@ -194,6 +194,7 @@ static void setup_gpmi_nand(void)
 #endif /* CONFIG_NAND_MXS */
 
 static struct i2c_pads_info i2c_pad_info1 = {
+	/* USB hub */
 	.scl = {
 		.i2c_mode = MX6_PAD_CSI0_DAT9__I2C1_SCL | I2C_PAD,
 		.gpio_mode = MX6_PAD_CSI0_DAT9__GPIO5_IO27 | I2C_PAD,
@@ -207,6 +208,7 @@ static struct i2c_pads_info i2c_pad_info1 = {
 };
 
 static struct i2c_pads_info i2c_pad_info2 = {
+	/* PMIC */
 	.scl = {
 		.i2c_mode = MX6_PAD_KEY_COL3__I2C2_SCL | I2C_PAD,
 		.gpio_mode = MX6_PAD_KEY_COL3__GPIO4_IO12 | I2C_PAD,
@@ -220,6 +222,7 @@ static struct i2c_pads_info i2c_pad_info2 = {
 };
 
 static struct i2c_pads_info i2c_pad_info3 = {
+	/* Touch */
 	.scl = {
 		.i2c_mode = MX6_PAD_GPIO_3__I2C3_SCL | I2C_PAD,
 		.gpio_mode = MX6_PAD_GPIO_3__GPIO1_IO03 | I2C_PAD,
@@ -403,6 +406,16 @@ iomux_v3_cfg_t const lcd_pads[] = {
 	MX6_PAD_SD4_DAT2__GPIO2_IO10 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
+iomux_v3_cfg_t const touch_pads[] = {
+	/* LCD_TOUCH_RST_N */
+#	define LCD_TOUCH_RST_N IMX_GPIO_NR(3,24)
+	MX6_PAD_EIM_D24__EIM_DATA24 | MUX_PAD_CTRL(NO_PAD_CTRL),
+
+	/* LCD_TOUCH_INT_N */
+#	define LCD_TOUCH_INT_N IMX_GPIO_NR(3,23)
+	MX6_PAD_EIM_D23__EIM_DATA23 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
 static void disable_lvds(struct display_info_t const *dev)
 {
 	printf("disable_lvds\n");
@@ -584,6 +597,14 @@ int board_init(void)
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info3);
+
+	/* I2C Touch */
+	imx_iomux_v3_setup_multiple_pads(touch_pads, ARRAY_SIZE(touch_pads));
+
+	/* assert reset on touch panel's I2C */
+	gpio_direction_output(LCD_TOUCH_RST_N, 0);
+	udelay(1000);
+	gpio_set_value(LCD_TOUCH_RST_N, 1);
 
 	setup_gpmi_nand();
 
