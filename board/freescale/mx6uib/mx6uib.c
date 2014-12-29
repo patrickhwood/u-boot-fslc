@@ -409,11 +409,11 @@ iomux_v3_cfg_t const lcd_pads[] = {
 iomux_v3_cfg_t const touch_pads[] = {
 	/* LCD_TOUCH_RST_N */
 #	define LCD_TOUCH_RST_N IMX_GPIO_NR(3,24)
-	MX6_PAD_EIM_D24__EIM_DATA24 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_EIM_D24__GPIO3_IO24 | MUX_PAD_CTRL(NO_PAD_CTRL),
 
 	/* LCD_TOUCH_INT_N */
 #	define LCD_TOUCH_INT_N IMX_GPIO_NR(3,23)
-	MX6_PAD_EIM_D23__EIM_DATA23 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_EIM_D23__GPIO3_IO23 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
 static void disable_lvds(struct display_info_t const *dev)
