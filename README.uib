@@ -1,0 +1,26 @@
+1. Install git, GCC ARM cross compiler (get gcc 4.7.x).
+
+  apt-get install git gcc-4.7-arm-linux-gnueabihf
+
+2. Clone this repository:
+
+  git clone git://github.com/patrickhwood/u-boot-fslc.git
+
+3. Go into the uboot subdirectory and checkout the UIB branch:
+
+  cd u-boot-fslc
+  git checkout UIB-v1
+
+4. Configure build for UIB:
+
+  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- mx6dluib_defconfig
+
+5. Build (note: set -jN where N == the number of cores on your CPU):
+
+  make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j4
+
+6. Copy the resulting u-boot.imx file onto your SD card, skipping the boot block
+   (note: assumes the SD card is located at /dev/sdb on your system; do a
+   "dmesg|tail" if you are unsure):
+
+  dd if=u-boot.imx of=/dev/sdb bs=1K seek=1
