@@ -1,4 +1,8 @@
-1. Install git, GCC ARM cross compiler (get gcc 4.7.x).
+These instructions have been tested on Ubuntu 12.04LTS and Ubuntu 14.04LTS.
+Android builds require a 64-bit install, so you should probably just go with
+that from the start.
+
+1. Install git, GCC ARM cross compiler (get gcc 4.7.x):
 
   apt-get install git gcc-4.7-arm-linux-gnueabihf
 
