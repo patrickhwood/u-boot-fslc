@@ -128,7 +128,6 @@ iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT7__SD3_DATA7 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 };
 
-
 #ifdef CONFIG_USB_EHCI_MX6
 
 #define GP_USB_OTG_PWR	IMX_GPIO_NR(3, 22)
@@ -251,13 +250,16 @@ static void setup_spi(void)
 #endif
 
 iomux_v3_cfg_t const pcie_pads[] = {
-	MX6_PAD_EIM_D19__GPIO3_IO19 | MUX_PAD_CTRL(NO_PAD_CTRL),	/* POWER */
-	MX6_PAD_GPIO_17__GPIO7_IO12 | MUX_PAD_CTRL(NO_PAD_CTRL),	/* RESET */
+#	define PCIE_RST_N IMX_GPIO_NR(1, 0)
+	MX6_PAD_GPIO_0__GPIO1_IO00 | MUX_PAD_CTRL(NO_PAD_CTRL),	/* RESET */
 };
 
 static void setup_pcie(void)
 {
 	imx_iomux_v3_setup_multiple_pads(pcie_pads, ARRAY_SIZE(pcie_pads));
+	gpio_direction_output(PCIE_RST_N, 0);
+	udelay(10000);
+	gpio_set_value(PCIE_RST_N, 1);
 }
 
 static void setup_iomux_uart(void)
@@ -447,12 +449,12 @@ struct display_info_t const displays[] = {{
 		.xres           = 1024,
 		.yres           = 600,
 		.pixclock       = 19531, /* ~51.2MHz */
-		.left_margin    = 320,
-		.right_margin   = 20,
-		.upper_margin   = 25,
-		.lower_margin   = 7,
-		.hsync_len      = 60,
-		.vsync_len      = 10,
+		.left_margin    = 100,
+		.right_margin   = 100,
+		.upper_margin   = 10,
+		.lower_margin   = 10,
+		.hsync_len      = 120,
+		.vsync_len      = 15,
 		.sync           = FB_SYNC_EXT,
 		.vmode          = FB_VMODE_NONINTERLACED
 } }, {
