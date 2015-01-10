@@ -625,19 +625,12 @@ static int ltc3676_init(void)
 	if (ret)
 		return ret;
 
-	/* mask PGOOD during SW1 transition */
-	reg = 0x1d | LTC3676_PGOOD_MASK;
-	pmic_reg_write(p, LTC3676_DVB1B, reg);
-	/* set SW1 (VDD_SOC) to 1259mV */
-	reg = 0x1d;
-	pmic_reg_write(p, LTC3676_DVB1A, reg);
-
-	/* mask PGOOD during SW3 transition */
-	reg = 0x1d | LTC3676_PGOOD_MASK;
-	pmic_reg_write(p, LTC3676_DVB3B, reg);
-	/*set SW3 (VDD_ARM) to 1259mV */
-	reg = 0x1d;
-	pmic_reg_write(p, LTC3676_DVB3A, reg);
+	/* mask PGOOD during SW4 transition */
+	reg = 0x19 | LTC3676_PGOOD_MASK;
+	pmic_reg_write(p, LTC3676_DVB4B, reg);
+	/*set SW4 (VCC_1.35) to 1.38V */
+	reg = 0x1a;
+	pmic_reg_write(p, LTC3676_DVB4A, reg);
 
 	return 0;
 }
