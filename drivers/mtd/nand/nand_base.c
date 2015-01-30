@@ -2095,8 +2095,8 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 		return ret;
 
 	if (mtd->ecc_stats.failed - stats.failed) {
-		pr_notice("%s: ecc stats failed: %d\n", mtd->ecc_stats.failed,
-			   __func__);
+		pr_notice("%s: ecc stats failed: %d\n", __func__,
+				 mtd->ecc_stats.failed);
 		return -EBADMSG;
 	}
 
