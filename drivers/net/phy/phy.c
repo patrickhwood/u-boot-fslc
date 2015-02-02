@@ -522,13 +522,11 @@ static struct phy_driver *get_phy_driver(struct phy_device *phydev,
 
 	list_for_each(entry, &phy_drivers) {
 		drv = list_entry(entry, struct phy_driver, list);
-		printf("get_phy_driver... drv->uid = %x, phy_id = %x\n", drv->uid, phy_id);
 		if ((drv->uid & drv->mask) == (phy_id & drv->mask))
 			return drv;
 	}
 
 	/* If we made it here, there's no driver for this PHY */
-	printf("get_phy_driver... return generic interface\n");
 	return generic_for_interface(interface);
 }
 
