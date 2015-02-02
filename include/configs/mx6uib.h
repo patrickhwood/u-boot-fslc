@@ -40,6 +40,9 @@
 #define CONFIG_PCIE_IMX
 #define CONFIG_PCIE_IMX_PERST_GPIO	IMX_GPIO_NR(1, 0)
 #define CONFIG_E1000
+#define E1000_DEBUG
+#define CONFIG_CMD_E1000
+#define CONFIG_E1000_SPI
 #endif
 
 /* I2C Configs */

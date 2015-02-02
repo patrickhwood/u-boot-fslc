@@ -16,6 +16,8 @@
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/boot_mode.h>
 #include <asm/imx-common/video.h>
+#include <asm/imx-common/spi.h>
+#include <malloc.h>
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <miiphy.h>
@@ -70,12 +72,15 @@ iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_CSI0_DAT11__UART1_RX_DATA | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
+static void setup_iomux_uart(void)
+{
+	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
+}
+
 iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_ENET_MDC__ENET_MDC		| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_ENET_MDIO__ENET_MDIO		| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_ENET_REF_CLK__ENET_TX_CLK	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_ENET_CRS_DV__ENET_RX_EN	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_ENET_RXD1__ENET_RX_DATA1 | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	// MX6_PAD_ENET_REF_CLK__ENET_TX_CLK	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_TXC__RGMII_TXC	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_TD0__RGMII_TD0	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_TD1__RGMII_TD1	| MUX_PAD_CTRL(ENET_PAD_CTRL),
@@ -88,6 +93,10 @@ iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_RGMII_RD2__RGMII_RD2	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_RD3__RGMII_RD3	| MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_RGMII_RX_CTL__RGMII_RX_CTL	| MUX_PAD_CTRL(ENET_PAD_CTRL),
+	/* reset */
+	MX6_PAD_ENET_CRS_DV__GPIO1_IO25	| MUX_PAD_CTRL(NO_PAD_CTRL),
+	/* IRQ */
+	MX6_PAD_ENET_RXD1__GPIO1_IO26 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
 static void setup_iomux_enet(void)
@@ -242,22 +251,43 @@ iomux_v3_cfg_t const ecspi1_pads[] = {
 	MX6_PAD_DISP0_DAT20__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_DISP0_DAT21__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	MX6_PAD_DISP0_DAT22__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	/* RFID CS */
+#	define RFID_CS IMX_GPIO_NR(5, 17)
 	MX6_PAD_DISP0_DAT23__ECSPI1_SS0 | MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* RFID EN */
+#	define RFID_EN IMX_GPIO_NR(3, 30)
 	MX6_PAD_EIM_D30__GPIO3_IO30 | MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* RFID IRQ */
+#	define RFID_IRQ IMX_GPIO_NR(3, 31)
 	MX6_PAD_EIM_D31__GPIO3_IO31 | MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* RFID MOD */
+#	define RFID_MOD IMX_GPIO_NR(4, 29)
 	MX6_PAD_DISP0_DAT8__GPIO4_IO29 | MUX_PAD_CTRL(NO_PAD_CTRL),
 	/* RFID ASK OOK */
+#	define RFID_ASKOOK IMX_GPIO_NR(4, 30)
 	MX6_PAD_DISP0_DAT9__GPIO4_IO30 | MUX_PAD_CTRL(NO_PAD_CTRL),
 };
 
 static void setup_spi(void)
 {
 	imx_iomux_v3_setup_multiple_pads(ecspi1_pads, ARRAY_SIZE(ecspi1_pads));
+
+	/* pull MOD and ASK/OOK high */
+	gpio_direction_output(RFID_MOD, 1);
+	gpio_direction_output(RFID_ASKOOK, 1);
+
+	/* this really isn't necessary, as we don't field IRQs here */
+	gpio_direction_input(RFID_IRQ);
+
+	/* enable RFID */
+	gpio_direction_output(RFID_EN, 1);
 }
-#endif
+
+int board_spi_cs_gpio(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0) ? (RFID_CS) : -1;
+}
+#endif /* CONFIG_MXC_SPI */
 
 iomux_v3_cfg_t const pcie_pads[] = {
 #	define PCIE_RESET_N_GPIO IMX_GPIO_NR(1, 0)
@@ -272,11 +302,6 @@ static void setup_pcie(void)
 	gpio_direction_output(PCIE_RESET_N_GPIO, 0);
 	udelay(500);
 	gpio_set_value(PCIE_RESET_N_GPIO, 1);
-}
-
-static void setup_iomux_uart(void)
-{
-	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 }
 
 #ifdef CONFIG_USB_EHCI_MX6
@@ -364,33 +389,8 @@ int board_mmc_init(bd_t *bis)
 }
 #endif
 
-int mx6_rgmii_rework(struct phy_device *phydev)
-{
-	unsigned short val;
-
-	/* To enable AR8031 ouput a 125MHz clk from CLK_25M */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
-
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
-	val &= 0xffe3;
-	val |= 0x18;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
-
-	/* introduce tx clock delay */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x5);
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
-	val |= 0x0100;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
-
-	return 0;
-}
-
 int board_phy_config(struct phy_device *phydev)
 {
-	mx6_rgmii_rework(phydev);
-
 	if (phydev->drv->config)
 		phydev->drv->config(phydev);
 
@@ -567,8 +567,58 @@ int overwrite_console(void)
 
 int board_eth_init(bd_t *bis)
 {
+	uint32_t base = IMX_FEC_BASE;
+	struct mii_dev *bus = NULL;
+	struct phy_device *phydev = NULL;
+	int ret;
+	int reg;
+	struct iomuxc *iomuxc_regs = (struct iomuxc *)IOMUXC_BASE_ADDR;
+	struct anatop_regs *anatop = (struct anatop_regs *)ANATOP_BASE_ADDR;
+
+	printf("board_eth_init\n");
+
+	ret = pci_eth_init(bis);
+	if (!ret)
+		return ret;
+
+	/* Use 125MHz anatop loopback REF_CLK1 for ENET1 */
+	clrsetbits_le32(&iomuxc_regs->gpr[1], IOMUX_GPR1_FEC1_MASK, 0);
+
+    reg = readl(&anatop->pll_enet);
+    reg |= BM_ANADIG_PLL_ENET_REF_25M_ENABLE;
+    writel(reg, &anatop->pll_enet);
+
+    ret = enable_fec_anatop_clock(ENET_125MHz);
+    if (ret)
+        return ret;
+
 	setup_iomux_enet();
-	setup_pcie();
+
+	/* reset PHY */
+	gpio_direction_output(IMX_GPIO_NR(1, 25) , 0);
+	udelay(10000);
+	gpio_set_value(IMX_GPIO_NR(1, 25), 1);
+	udelay(10000);
+
+	bus = fec_get_miibus(base, -1);
+	if (!bus) {
+		printf("%s: can't get FEC bus\n", __func__);
+		return -1;
+	}
+	/* scan phy 4,5,6,7 */
+	phydev = phy_find_by_mask(bus, (0xf << 4), PHY_INTERFACE_MODE_RGMII);
+	if (!phydev) {
+		free(bus);
+		return -1;
+	}
+	printf("%s: using phy at %d\n", __func__, phydev->addr);
+	ret  = fec_probe(bis, -1, base, bus, phydev);
+	if (ret) {
+		printf("FEC MXC: %s:failed\n", __func__);
+		free(phydev);
+		free(bus);
+		return -1;
+	}
 
 	return cpu_eth_init(bis);
 }
@@ -601,6 +651,7 @@ int board_init(void)
 #ifdef CONFIG_MXC_SPI
 	setup_spi();
 #endif
+
 	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info1);
 	setup_i2c(1, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info3);
@@ -614,6 +665,8 @@ int board_init(void)
 	gpio_set_value(LCD_TOUCH_RST_N, 1);
 
 	setup_gpmi_nand();
+
+	setup_pcie();
 
 	return 0;
 }
@@ -643,13 +696,6 @@ static int ltc3676_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_MXC_SPI
-int board_spi_cs_gpio(unsigned bus, unsigned cs)
-{
-	return (bus == 0 && cs == 0) ? (IMX_GPIO_NR(4, 9)) : -1;
-}
-#endif
-
 #ifdef CONFIG_CMD_BMODE
 static const struct boot_mode board_boot_modes[] = {
 	/* 4 bit bus width */
@@ -667,7 +713,7 @@ int board_late_init(void)
 	add_board_boot_modes(board_boot_modes);
 #endif
 	int ret = ltc3676_init();
-	printf("ltc3676_init returned %d\n", ret);
+	printf("%s: ltc3676_init returned %d\n", __func__, ret);
 
 	return 0;
 }
