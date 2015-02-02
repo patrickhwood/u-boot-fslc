@@ -502,7 +502,7 @@ static int32_t e1000_init_eeprom_params(struct e1000_hw *hw)
 			eeprom->use_eewr = true;
 
 			eeprom->type = e1000_eeprom_flash;
-			eeprom->word_size = 2048;
+			eeprom->word_size = 4096;
 
 		/* Ensure that the Autonomous FLASH update bit is cleared due to
 		 * Flash update issue on parts which use a FLASH for NVM. */
@@ -5474,6 +5474,8 @@ U_BOOT_CMD(
 	"e1000 <card#> spi dump <addr> <offset> <length>\n"
 	"e1000 <card#> spi program <addr> <offset> <length>\n"
 	"e1000 <card#> spi checksum [update]\n"
+	"e1000 <card#> spi erase\n"
+	"e1000 <card#> spi unlock\n"
 #endif
 	"       - Manage the Intel E1000 PCI device"
 );

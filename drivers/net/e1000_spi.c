@@ -1,6 +1,40 @@
 #include "e1000.h"
 #include <linux/compiler.h>
 
+/******************************************************************************
+ * Raises the FLASH's clock input.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * fla - FLA's current value
+ *****************************************************************************/
+static void e1000_raise_fl_clk(struct e1000_hw *hw, uint32_t * fla)
+{
+	/* Raise the clock input to the FLASH (by setting the SK bit), and then
+	 * wait 10 microseconds.
+	 */
+	*fla = *fla | E1000_FL_NVM_SK;
+	E1000_WRITE_REG(hw, FLA, *fla);
+	E1000_WRITE_FLUSH(hw);
+	udelay(hw->eeprom.delay_usec);
+}
+
+/******************************************************************************
+ * Lowers the FLASH's clock input.
+ *
+ * hw - Struct containing variables accessed by shared code
+ * fla - FLA's current value
+ *****************************************************************************/
+static void e1000_lower_fl_clk(struct e1000_hw *hw, uint32_t * fla)
+{
+	/* Lower the clock input to the FLASH (by clearing the SK bit), and then
+	 * wait 10 microseconds.
+	 */
+	*fla = *fla & ~E1000_FL_NVM_SK;
+	E1000_WRITE_REG(hw, FLA, *fla);
+	E1000_WRITE_FLUSH(hw);
+	udelay(hw->eeprom.delay_usec);
+}
+
 /*-----------------------------------------------------------------------
  * SPI transfer
  *
@@ -23,11 +57,11 @@ static int e1000_spi_xfer(struct e1000_hw *hw, unsigned int bitlen,
 	uint8_t *din = din_mem;
 
 	uint8_t mask = 0;
-	uint32_t eecd;
+	uint32_t fla;
 	unsigned long i;
 
 	/* Pre-read the control register */
-	eecd = E1000_READ_REG(hw, EECD);
+	fla = E1000_READ_REG(hw, FLA);
 
 	/* Iterate over each bit */
 	for (i = 0, mask = 0x80; i < bitlen; i++, mask = (mask >> 1)?:0x80) {
@@ -37,29 +71,29 @@ static int e1000_spi_xfer(struct e1000_hw *hw, unsigned int bitlen,
 
 		/* Determine the output bit */
 		if (dout && dout[i >> 3] & mask)
-			eecd |=  E1000_EECD_DI;
+			fla |=  E1000_FL_SI;
 		else
-			eecd &= ~E1000_EECD_DI;
+			fla &= ~E1000_FL_SI;
 
-		/* Write the output bit and wait 50us */
-		E1000_WRITE_REG(hw, EECD, eecd);
+		/* Write the output bit and wait 1us */
+		E1000_WRITE_REG(hw, FLA, fla);
 		E1000_WRITE_FLUSH(hw);
-		udelay(50);
+		udelay(hw->eeprom.delay_usec);
 
-		/* Poke the clock (waits 50us) */
-		e1000_raise_ee_clk(hw, &eecd);
+		/* Poke the clock (waits 1us) */
+		e1000_raise_fl_clk(hw, &fla);
 
 		/* Now read the input bit */
-		eecd = E1000_READ_REG(hw, EECD);
+		fla = E1000_READ_REG(hw, FLA);
 		if (din) {
-			if (eecd & E1000_EECD_DO)
+			if (fla & E1000_FL_SO)
 				din[i >> 3] |=  mask;
 			else
 				din[i >> 3] &= ~mask;
 		}
 
-		/* Poke the clock again (waits 50us) */
-		e1000_lower_ee_clk(hw, &eecd);
+		/* Poke the clock again (waits 1us) */
+		e1000_lower_fl_clk(hw, &fla);
 	}
 
 	/* Now clear any remaining bits of the input */
@@ -67,6 +101,96 @@ static int e1000_spi_xfer(struct e1000_hw *hw, unsigned int bitlen,
 		din[i >> 3] &= ~((mask << 1) - 1);
 
 	return 0;
+}
+
+/******************************************************************************
+ * Returns FLASH to a "standby" state
+ *
+ * hw - Struct containing variables accessed by shared code
+ *****************************************************************************/
+void e1000_standby_flash(struct e1000_hw *hw)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t fla;
+
+	fla = E1000_READ_REG(hw, FLA);
+
+	if (eeprom->type == e1000_eeprom_flash) {
+		/* Toggle CE to flush commands */
+		fla |= E1000_FL_CEN;
+		E1000_WRITE_REG(hw, FLA, fla);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+		fla &= ~E1000_FL_CEN;
+		E1000_WRITE_REG(hw, FLA, fla);
+		E1000_WRITE_FLUSH(hw);
+		udelay(eeprom->delay_usec);
+	}
+}
+
+/******************************************************************************
+ * Prepares FLASH for access
+ *
+ * hw - Struct containing variables accessed by shared code
+ *
+ * Lowers FLASH clock. Clears input pin. Sets the chip select pin. This
+ * function should be called before issuing a command to the FLASH.
+ *****************************************************************************/
+static int32_t e1000_acquire_flash(struct e1000_hw *hw)
+{
+	struct e1000_eeprom_info *eeprom = &hw->eeprom;
+	uint32_t fla, i;
+
+	DEBUGFUNC();
+
+	fla = E1000_READ_REG(hw, FLA);
+
+	/* Setup FLASH for Read/Write */
+
+	if (eeprom->type == e1000_eeprom_flash) {
+		fla |= E1000_FL_REQ;
+		E1000_WRITE_REG(hw, FLA, fla);
+		for (i = 0; (!(fla & E1000_FL_GNT)) &&
+		       (i < E1000_EEPROM_GRANT_ATTEMPTS); i++) {
+                udelay(5);
+                fla = E1000_READ_REG(hw, FLA);
+		}
+		if (!(fla & E1000_FL_GNT)) {
+			fla &= ~E1000_FL_REQ;
+			E1000_WRITE_REG(hw, FLA, fla);
+			E1000_DBG(hw->nic, "Could not acquire FLASH grant: fla=%x\n", fla);
+			return -E1000_ERR_EEPROM;
+		}
+
+		/* Clear SI, SK and enable CEN */
+		fla &= ~(E1000_FL_SI | E1000_FL_CEN | E1000_FL_NVM_SK);
+		E1000_WRITE_REG(hw, FLA, fla);
+		udelay(1);
+	}
+	E1000_DBG(hw->nic, "acquire succeeded\n");
+
+	return E1000_SUCCESS;
+}
+
+void e1000_release_flash(struct e1000_hw *hw)
+{
+	uint32_t fla;
+
+	DEBUGFUNC();
+
+	fla = E1000_READ_REG(hw, FLA);
+
+	if (hw->eeprom.type == e1000_eeprom_flash) {
+		fla |= E1000_FL_CEN;  /* Drive CEN high */
+		fla &= ~E1000_FL_NVM_SK; /* Lower SCK */
+
+		E1000_WRITE_REG(hw, FLA, fla);
+
+		udelay(hw->eeprom.delay_usec);
+
+		fla &= ~E1000_FL_REQ;
+		E1000_WRITE_REG(hw, FLA, fla);
+	}
 }
 
 #ifdef CONFIG_E1000_SPI_GENERIC
@@ -86,13 +210,13 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	/* Find the right PCI device */
 	struct e1000_hw *hw = e1000_find_card(bus);
 	if (!hw) {
-		printf("ERROR: No such e1000 device: e1000#%u\n", bus);
+		E1000_ERR(hw->nic, "No such e1000 device: e1000#%u\n", bus);
 		return NULL;
 	}
 
 	/* Make sure it has an SPI chip */
-	if (hw->eeprom.type != e1000_eeprom_spi) {
-		E1000_ERR(hw->nic, "No attached SPI EEPROM found!\n");
+	if (hw->eeprom.type != e1000_eeprom_flash) {
+		E1000_ERR(hw->nic, "No attached SPI FLASH found!\n");
 		return NULL;
 	}
 
@@ -107,22 +231,22 @@ struct spi_slave *spi_setup_slave(unsigned int bus, unsigned int cs,
 	}
 
 	/* TODO: Use max_hz somehow */
-	E1000_DBG(hw->nic, "EEPROM SPI access requested\n");
+	E1000_DBG(hw->nic, "FLASH SPI access requested\n");
 	return &hw->spi;
 }
 
 void spi_free_slave(struct spi_slave *spi)
 {
 	__maybe_unused struct e1000_hw *hw = e1000_hw_from_spi(spi);
-	E1000_DBG(hw->nic, "EEPROM SPI access released\n");
+	E1000_DBG(hw->nic, "FLASH SPI access released\n");
 }
 
 int spi_claim_bus(struct spi_slave *spi)
 {
 	struct e1000_hw *hw = e1000_hw_from_spi(spi);
 
-	if (e1000_acquire_eeprom(hw)) {
-		E1000_ERR(hw->nic, "EEPROM SPI cannot be acquired!\n");
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
 		return -1;
 	}
 
@@ -132,7 +256,7 @@ int spi_claim_bus(struct spi_slave *spi)
 void spi_release_bus(struct spi_slave *spi)
 {
 	struct e1000_hw *hw = e1000_hw_from_spi(spi);
-	e1000_release_eeprom(hw);
+	e1000_release_flash(hw);
 }
 
 /* Skinny wrapper around e1000_spi_xfer */
@@ -143,12 +267,12 @@ int spi_xfer(struct spi_slave *spi, unsigned int bitlen,
 	int ret;
 
 	if (flags & SPI_XFER_BEGIN)
-		e1000_standby_eeprom(hw);
+		e1000_standby_flash(hw);
 
 	ret = e1000_spi_xfer(hw, bitlen, dout_mem, din_mem, true);
 
 	if (flags & SPI_XFER_END)
-		e1000_standby_eeprom(hw);
+		e1000_standby_flash(hw);
 
 	return ret;
 }
@@ -157,66 +281,57 @@ int spi_xfer(struct spi_slave *spi, unsigned int bitlen,
 
 #ifdef CONFIG_CMD_E1000
 
-/* The EEPROM opcodes */
-#define SPI_EEPROM_ENABLE_WR	0x06
-#define SPI_EEPROM_DISABLE_WR	0x04
-#define SPI_EEPROM_WRITE_STATUS	0x01
-#define SPI_EEPROM_READ_STATUS	0x05
-#define SPI_EEPROM_WRITE_PAGE	0x02
-#define SPI_EEPROM_READ_PAGE	0x03
+/* The FLASH opcodes */
+#define SPI_FLASH_ENABLE_WR	0x06
+#define SPI_FLASH_DISABLE_WR	0x04
+#define SPI_FLASH_WRITE_STATUS	0x01
+#define SPI_FLASH_READ_STATUS	0x05
+#define SPI_FLASH_WRITE_PAGE	0x02
+#define SPI_FLASH_READ_PAGE		0x03
+#define SPI_FLASH_CHIP_ERASE	0x60
 
-/* The EEPROM status bits */
-#define SPI_EEPROM_STATUS_BUSY	0x01
-#define SPI_EEPROM_STATUS_WREN	0x02
+/* The FLASH status bits */
+#define SPI_FLASH_STATUS_BUSY	0x01
+#define SPI_FLASH_STATUS_WREN	0x02
+#define SPI_FLASH_BPL_MASK		0x3C
+#define SPI_FLASH_BPL_RO		0x80
 
-static int e1000_spi_eeprom_enable_wr(struct e1000_hw *hw, bool intr)
+static int e1000_spi_flash_enable_wr(struct e1000_hw *hw, bool intr)
 {
-	u8 op[] = { SPI_EEPROM_ENABLE_WR };
-	e1000_standby_eeprom(hw);
+	u8 op[] = { SPI_FLASH_ENABLE_WR };
+	e1000_standby_flash(hw);
 	return e1000_spi_xfer(hw, 8*sizeof(op), op, NULL, intr);
 }
 
-/*
- * These have been tested to perform correctly, but they are not used by any
- * of the EEPROM commands at this time.
- */
-#if 0
-static int e1000_spi_eeprom_disable_wr(struct e1000_hw *hw, bool intr)
-{
-	u8 op[] = { SPI_EEPROM_DISABLE_WR };
-	e1000_standby_eeprom(hw);
-	return e1000_spi_xfer(hw, 8*sizeof(op), op, NULL, intr);
-}
-
-static int e1000_spi_eeprom_write_status(struct e1000_hw *hw,
+static int e1000_spi_flash_write_status(struct e1000_hw *hw,
 		u8 status, bool intr)
 {
-	u8 op[] = { SPI_EEPROM_WRITE_STATUS, status };
-	e1000_standby_eeprom(hw);
+	u8 op[] = { SPI_FLASH_WRITE_STATUS, status };
+	e1000_spi_flash_enable_wr(hw, intr);
+	e1000_standby_flash(hw);
 	return e1000_spi_xfer(hw, 8*sizeof(op), op, NULL, intr);
 }
-#endif
 
-static int e1000_spi_eeprom_read_status(struct e1000_hw *hw, bool intr)
+static int e1000_spi_flash_read_status(struct e1000_hw *hw, bool intr)
 {
-	u8 op[] = { SPI_EEPROM_READ_STATUS, 0 };
-	e1000_standby_eeprom(hw);
+	u8 op[] = { SPI_FLASH_READ_STATUS, 0 };
+	e1000_standby_flash(hw);
 	if (e1000_spi_xfer(hw, 8*sizeof(op), op, op, intr))
 		return -1;
 	return op[1];
 }
 
-static int e1000_spi_eeprom_write_page(struct e1000_hw *hw,
+static int e1000_spi_flash_write_page(struct e1000_hw *hw,
 		const void *data, u16 off, u16 len, bool intr)
 {
 	u8 op[] = {
-		SPI_EEPROM_WRITE_PAGE,
-		(off >> (hw->eeprom.address_bits - 8)) & 0xff, off & 0xff
+		SPI_FLASH_WRITE_PAGE,
+		(off >> 16) & 0xff, (off >> 8) & 0xff, off & 0xff
 	};
 
-	e1000_standby_eeprom(hw);
+	e1000_standby_flash(hw);
 
-	if (e1000_spi_xfer(hw, 8 + hw->eeprom.address_bits, op, NULL, intr))
+	if (e1000_spi_xfer(hw, 8 + 24, op, NULL, intr))
 		return -1;
 	if (e1000_spi_xfer(hw, len << 3, data, NULL, intr))
 		return -1;
@@ -224,17 +339,17 @@ static int e1000_spi_eeprom_write_page(struct e1000_hw *hw,
 	return 0;
 }
 
-static int e1000_spi_eeprom_read_page(struct e1000_hw *hw,
+static int e1000_spi_flash_read_page(struct e1000_hw *hw,
 		void *data, u16 off, u16 len, bool intr)
 {
 	u8 op[] = {
-		SPI_EEPROM_READ_PAGE,
-		(off >> (hw->eeprom.address_bits - 8)) & 0xff, off & 0xff
+		SPI_FLASH_READ_PAGE,
+		(off >> 16) & 0xff, (off >> 8) & 0xff, off & 0xff
 	};
 
-	e1000_standby_eeprom(hw);
+	e1000_standby_flash(hw);
 
-	if (e1000_spi_xfer(hw, 8 + hw->eeprom.address_bits, op, NULL, intr))
+	if (e1000_spi_xfer(hw, 8 + 24, op, NULL, intr))
 		return -1;
 	if (e1000_spi_xfer(hw, len << 3, NULL, data, intr))
 		return -1;
@@ -242,21 +357,27 @@ static int e1000_spi_eeprom_read_page(struct e1000_hw *hw,
 	return 0;
 }
 
-static int e1000_spi_eeprom_poll_ready(struct e1000_hw *hw, bool intr)
+static int e1000_spi_flash_poll_ready(struct e1000_hw *hw, bool intr)
 {
 	int status;
-	while ((status = e1000_spi_eeprom_read_status(hw, intr)) >= 0) {
-		if (!(status & SPI_EEPROM_STATUS_BUSY))
+	while ((status = e1000_spi_flash_read_status(hw, intr)) >= 0) {
+		if (!(status & SPI_FLASH_STATUS_BUSY))
 			return 0;
 	}
 	return -1;
 }
 
-static int e1000_spi_eeprom_dump(struct e1000_hw *hw,
+int e1000_spi_flash_clear_bp(struct e1000_hw *hw, bool intr)
+{
+	/* clear block protect bits */
+	return e1000_spi_flash_write_status(hw, (u8) ~(SPI_FLASH_BPL_MASK|SPI_FLASH_BPL_RO), intr);
+}
+
+static int e1000_spi_flash_dump(struct e1000_hw *hw,
 		void *data, u16 off, unsigned int len, bool intr)
 {
-	/* Interruptibly wait for the EEPROM to be ready */
-	if (e1000_spi_eeprom_poll_ready(hw, intr))
+	/* Interruptibly wait for the FLASH to be ready */
+	if (e1000_spi_flash_poll_ready(hw, intr))
 		return -1;
 
 	/* Dump each page in sequence */
@@ -268,7 +389,7 @@ static int e1000_spi_eeprom_dump(struct e1000_hw *hw,
 			pg_len = len;
 
 		/* Now dump the page */
-		if (e1000_spi_eeprom_read_page(hw, data, off, pg_len, intr))
+		if (e1000_spi_flash_read_page(hw, data, off, pg_len, intr))
 			return -1;
 
 		/* Otherwise go on to the next page */
@@ -281,27 +402,31 @@ static int e1000_spi_eeprom_dump(struct e1000_hw *hw,
 	return 0;
 }
 
-static int e1000_spi_eeprom_program(struct e1000_hw *hw,
+static int e1000_spi_flash_program(struct e1000_hw *hw,
 		const void *data, u16 off, u16 len, bool intr)
 {
+	/* clear the block protect bits in the status register */
+	if (e1000_spi_flash_clear_bp(hw, true) < 0) {
+		E1000_ERR(hw->nic, "clear_bp failed!\n");
+		e1000_release_flash(hw);
+		return 1;
+	}
+
 	/* Program each page in sequence */
 	while (len) {
 		/* Calculate the data bytes on this page */
-		u16 pg_off = off & (hw->eeprom.page_size - 1);
-		u16 pg_len = hw->eeprom.page_size - pg_off;
-		if (pg_len > len)
-			pg_len = len;
+		u16 pg_len = 1;
 
-		/* Interruptibly wait for the EEPROM to be ready */
-		if (e1000_spi_eeprom_poll_ready(hw, intr))
+		/* Interruptibly wait for the FLASH to be ready */
+		if (e1000_spi_flash_poll_ready(hw, intr))
 			return -1;
 
 		/* Enable write access */
-		if (e1000_spi_eeprom_enable_wr(hw, intr))
+		if (e1000_spi_flash_enable_wr(hw, intr))
 			return -1;
 
 		/* Now program the page */
-		if (e1000_spi_eeprom_write_page(hw, data, off, pg_len, intr))
+		if (e1000_spi_flash_write_page(hw, data, off, pg_len, intr))
 			return -1;
 
 		/* Otherwise go on to the next page */
@@ -311,7 +436,7 @@ static int e1000_spi_eeprom_program(struct e1000_hw *hw,
 	}
 
 	/* Wait for the last write to complete */
-	if (e1000_spi_eeprom_poll_ready(hw, intr))
+	if (e1000_spi_flash_poll_ready(hw, intr))
 		return -1;
 
 	/* We're done! */
@@ -356,14 +481,14 @@ static int do_e1000_spi_show(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 		return 1;
 	}
 
-	/* Acquire the EEPROM and perform the dump */
-	if (e1000_acquire_eeprom(hw)) {
-		E1000_ERR(hw->nic, "EEPROM SPI cannot be acquired!\n");
+	/* Acquire the FLASH and perform the dump */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
 		free(buffer);
 		return 1;
 	}
-	err = e1000_spi_eeprom_dump(hw, buffer, offset, length, true);
-	e1000_release_eeprom(hw);
+	err = e1000_spi_flash_dump(hw, buffer, offset, length, true);
+	e1000_release_flash(hw);
 	if (err) {
 		E1000_ERR(hw->nic, "Interrupted!\n");
 		free(buffer);
@@ -371,7 +496,7 @@ static int do_e1000_spi_show(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 	}
 
 	/* Now hexdump the result */
-	printf("%s: ===== Intel e1000 EEPROM (0x%04hX - 0x%04hX) =====",
+	printf("%s: ===== Intel e1000 FLASH (0x%04hX - 0x%04hX) =====",
 			hw->nic->name, offset, offset + length - 1);
 	for (i = 0; i < length; i++) {
 		if ((i & 0xF) == 0)
@@ -414,21 +539,21 @@ static int do_e1000_spi_dump(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 		return 1;
 	}
 
-	/* Acquire the EEPROM */
-	if (e1000_acquire_eeprom(hw)) {
-		E1000_ERR(hw->nic, "EEPROM SPI cannot be acquired!\n");
+	/* Acquire the FLASH */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
 		return 1;
 	}
 
-	/* Perform the programming operation */
-	if (e1000_spi_eeprom_dump(hw, dest, offset, length, true) < 0) {
+	/* Perform the dump operation */
+	if (e1000_spi_flash_dump(hw, dest, offset, length, true) < 0) {
 		E1000_ERR(hw->nic, "Interrupted!\n");
-		e1000_release_eeprom(hw);
+		e1000_release_flash(hw);
 		return 1;
 	}
 
-	e1000_release_eeprom(hw);
-	printf("%s: ===== EEPROM DUMP COMPLETE =====\n", hw->nic->name);
+	e1000_release_flash(hw);
+	printf("%s: ===== FLASH DUMP COMPLETE =====\n", hw->nic->name);
 	return 0;
 }
 
@@ -449,21 +574,21 @@ static int do_e1000_spi_program(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 	offset = simple_strtoul(argv[1], NULL, 0);
 	length = simple_strtoul(argv[2], NULL, 0);
 
-	/* Acquire the EEPROM */
-	if (e1000_acquire_eeprom(hw)) {
-		E1000_ERR(hw->nic, "EEPROM SPI cannot be acquired!\n");
+	/* Acquire the FLASH */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
 		return 1;
 	}
 
 	/* Perform the programming operation */
-	if (e1000_spi_eeprom_program(hw, source, offset, length, true) < 0) {
-		E1000_ERR(hw->nic, "Interrupted!\n");
-		e1000_release_eeprom(hw);
+	if (e1000_spi_flash_program(hw, source, offset, length, true) < 0) {
+		E1000_ERR(hw->nic, "Interrupted e1000_spi_flash_program!\n");
+		e1000_release_flash(hw);
 		return 1;
 	}
 
-	e1000_release_eeprom(hw);
-	printf("%s: ===== EEPROM PROGRAMMED =====\n", hw->nic->name);
+	e1000_release_flash(hw);
+	printf("%s: ===== FLASH PROGRAMMED =====\n", hw->nic->name);
 	return 0;
 }
 
@@ -487,20 +612,20 @@ static int do_e1000_spi_checksum(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 	length = sizeof(uint16_t) * (EEPROM_CHECKSUM_REG + 1);
 	buffer = malloc(length);
 	if (!buffer) {
-		E1000_ERR(hw->nic, "Unable to allocate EEPROM buffer!\n");
+		E1000_ERR(hw->nic, "Unable to allocate FLASH buffer!\n");
 		return 1;
 	}
 
-	/* Acquire the EEPROM */
-	if (e1000_acquire_eeprom(hw)) {
-		E1000_ERR(hw->nic, "EEPROM SPI cannot be acquired!\n");
+	/* Acquire the FLASH */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
 		return 1;
 	}
 
-	/* Read the EEPROM */
-	if (e1000_spi_eeprom_dump(hw, buffer, 0, length, true) < 0) {
+	/* Read the FLASH */
+	if (e1000_spi_flash_dump(hw, buffer, 0, length, true) < 0) {
 		E1000_ERR(hw->nic, "Interrupted!\n");
-		e1000_release_eeprom(hw);
+		e1000_release_flash(hw);
 		return 1;
 	}
 
@@ -512,34 +637,83 @@ static int do_e1000_spi_checksum(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 
 	/* Verify it! */
 	if (checksum_reg == checksum) {
-		printf("%s: INFO: EEPROM checksum is correct! (0x%04hx)\n",
+		printf("%s: INFO: FLASH checksum is correct! (0x%04hx)\n",
 				hw->nic->name, checksum);
-		e1000_release_eeprom(hw);
+		e1000_release_flash(hw);
 		return 0;
 	}
 
 	/* Hrm, verification failed, print an error */
-	E1000_ERR(hw->nic, "EEPROM checksum is incorrect!\n");
+	E1000_ERR(hw->nic, "FLASH checksum is incorrect!\n");
 	E1000_ERR(hw->nic, "  ...register was 0x%04hx, calculated 0x%04hx\n",
 			checksum_reg, checksum);
 
 	/* If they didn't ask us to update it, just return an error */
 	if (!upd) {
-		e1000_release_eeprom(hw);
+		e1000_release_flash(hw);
 		return 1;
 	}
 
 	/* Ok, correct it! */
-	printf("%s: Reprogramming the EEPROM checksum...\n", hw->nic->name);
+	printf("%s: Reprogramming the FLASH checksum...\n", hw->nic->name);
 	buffer[i] = cpu_to_le16(checksum);
-	if (e1000_spi_eeprom_program(hw, &buffer[i], i * sizeof(uint16_t),
+	if (e1000_spi_flash_program(hw, &buffer[i], i * sizeof(uint16_t),
 			sizeof(uint16_t), true)) {
 		E1000_ERR(hw->nic, "Interrupted!\n");
-		e1000_release_eeprom(hw);
+		e1000_release_flash(hw);
 		return 1;
 	}
 
-	e1000_release_eeprom(hw);
+	e1000_release_flash(hw);
+	return 0;
+}
+
+static int do_e1000_spi_erase(cmd_tbl_t *cmdtp, struct e1000_hw *hw, bool intr)
+{
+	u8 op[] = { SPI_FLASH_CHIP_ERASE };
+
+	/* Acquire the FLASH */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
+		return 1;
+	}
+
+	/* clear the block protect bits in the status register */
+	e1000_standby_flash(hw);
+	if (e1000_spi_flash_clear_bp(hw, true) < 0) {
+		E1000_ERR(hw->nic, "clear_bp failed!\n");
+		e1000_release_flash(hw);
+		return 1;
+	}
+
+	e1000_spi_flash_enable_wr(hw, intr);
+
+	e1000_standby_flash(hw);
+	e1000_spi_xfer(hw, 8*sizeof(op), op, NULL, intr);
+
+	e1000_release_flash(hw);
+
+	return 0;
+}
+
+static int do_e1000_spi_unlock(cmd_tbl_t *cmdtp, struct e1000_hw *hw, bool intr)
+{
+	/* Acquire the FLASH */
+	if (e1000_acquire_flash(hw)) {
+		E1000_ERR(hw->nic, "FLASH SPI cannot be acquired!\n");
+		return 1;
+	}
+
+	E1000_DBG(hw->nic, "status = %x\n", e1000_spi_flash_read_status(hw, intr));
+	/* clear the block protect bits in the status register */
+	e1000_standby_flash(hw);
+	if (e1000_spi_flash_clear_bp(hw, true) < 0) {
+		E1000_ERR(hw->nic, "clear_bp failed!\n");
+		e1000_release_flash(hw);
+		return 1;
+	}
+	E1000_DBG(hw->nic, "status = %x\n", e1000_spi_flash_read_status(hw, intr));
+	e1000_release_flash(hw);
 	return 0;
 }
 
@@ -552,8 +726,8 @@ int do_e1000_spi(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 	}
 
 	/* Make sure it has an SPI chip */
-	if (hw->eeprom.type != e1000_eeprom_spi) {
-		E1000_ERR(hw->nic, "No attached SPI EEPROM found!\n");
+	if (hw->eeprom.type != e1000_eeprom_flash) {
+		E1000_ERR(hw->nic, "No attached SPI FLASH found!\n");
 		return 1;
 	}
 
@@ -569,6 +743,12 @@ int do_e1000_spi(cmd_tbl_t *cmdtp, struct e1000_hw *hw,
 
 	if (!strcmp(argv[0], "checksum"))
 		return do_e1000_spi_checksum(cmdtp, hw, argc - 1, argv + 1);
+
+	if (!strcmp(argv[0], "erase"))
+		return do_e1000_spi_erase(cmdtp, hw, true);
+
+	if (!strcmp(argv[0], "unlock"))
+		return do_e1000_spi_unlock(cmdtp, hw, true);
 
 	cmd_usage(cmdtp);
 	return 1;

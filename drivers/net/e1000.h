@@ -694,6 +694,7 @@ struct e1000_ffvt_entry {
 #define E1000_EERD     0x00014	/* EEPROM Read - RW */
 #define E1000_I210_EERD     0x12014	/* EEPROM Read - RW */
 #define E1000_CTRL_EXT 0x00018	/* Extended Device Control - RW */
+#define E1000_FLA      0x0001C	/* Flash Control - RW */
 #define E1000_MDIC     0x00020	/* MDI Control - RW */
 #define E1000_FCAL     0x00028	/* Flow Control Address Low - RW */
 #define E1000_FCAH     0x0002C	/* Flow Control Address High -RW */
@@ -1365,6 +1366,15 @@ struct e1000_hw {
 #define E1000_CTRL_EXT_WR_WMARK_320   0x01000000
 #define E1000_CTRL_EXT_WR_WMARK_384   0x02000000
 #define E1000_CTRL_EXT_WR_WMARK_448   0x03000000
+
+/* FLASH Control */
+#define E1000_FL_NVM_SK    0x00000001   /* FLASH Clock */
+#define E1000_FL_CEN       0x00000002   /* FLASH Chip Enable Active Low */
+#define E1000_FL_SI        0x00000004   /* FLASH Data In */
+#define E1000_FL_SO        0x00000008   /* FLASH Data Out */
+#define E1000_FL_REQ       0x00000010   /* FLASH Request */
+#define E1000_FL_GNT       0x00000020   /* FLASH Grant */
+#define E1000_FL_WR_DONE   0x00000200   /* FLASH Write Done */
 
 /* MDI Control */
 #define E1000_MDIC_DATA_MASK 0x0000FFFF
