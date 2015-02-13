@@ -588,10 +588,6 @@ int board_eth_init(bd_t *bis)
     reg |= BM_ANADIG_PLL_ENET_REF_25M_ENABLE;
     writel(reg, &anatop->pll_enet);
 
-    ret = enable_fec_anatop_clock(ENET_125MHz);
-    if (ret)
-        return ret;
-
 	setup_iomux_enet();
 
 	/* reset PHY */
