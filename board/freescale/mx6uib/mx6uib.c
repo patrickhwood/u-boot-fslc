@@ -253,7 +253,7 @@ iomux_v3_cfg_t const ecspi1_pads[] = {
 	MX6_PAD_DISP0_DAT22__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	/* RFID CS */
 #	define RFID_CS IMX_GPIO_NR(5, 17)
-	MX6_PAD_DISP0_DAT23__ECSPI1_SS0 | MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_DISP0_DAT23__ECSPI1_SS0 | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	/* RFID EN */
 #	define RFID_EN IMX_GPIO_NR(3, 30)
 	MX6_PAD_EIM_D30__GPIO3_IO30 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -285,7 +285,7 @@ static void setup_spi(void)
 
 int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
-	return (bus == 0 && cs == 0) ? (RFID_CS) : -1;
+	return -1;
 }
 #endif /* CONFIG_MXC_SPI */
 
