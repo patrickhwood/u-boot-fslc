@@ -567,7 +567,6 @@ int overwrite_console(void)
 
 int board_eth_init(bd_t *bis)
 {
-	uint32_t base = IMX_FEC_BASE;
 	struct mii_dev *bus = NULL;
 	struct phy_device *phydev = NULL;
 	int ret;
@@ -588,6 +587,8 @@ int board_eth_init(bd_t *bis)
     reg |= BM_ANADIG_PLL_ENET_REF_25M_ENABLE;
     writel(reg, &anatop->pll_enet);
 
+#ifdef IMX_FEC_BASE
+	uint32_t base = IMX_FEC_BASE;
 	setup_iomux_enet();
 
 	/* reset PHY */
@@ -617,6 +618,9 @@ int board_eth_init(bd_t *bis)
 	}
 
 	return cpu_eth_init(bis);
+#else
+	return 0;
+#endif
 }
 
 int board_early_init_f(void)
