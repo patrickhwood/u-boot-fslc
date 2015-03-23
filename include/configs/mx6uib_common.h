@@ -70,9 +70,19 @@
 	#define CONFIG_PHY_MICREL
 #endif
 
-#define CONFIG_MXC_SPI
+/* #define CONFIG_MXC_SPI */
+#define CONFIG_SOFT_SPI
 #define CONFIG_CMD_SPI
 #define CONFIG_SPI
+
+#define SPI1_SCL_GPIO IMX_GPIO_NR(5, 14)
+#define SPI1_MOSI_GPIO IMX_GPIO_NR(5, 15)
+#define SPI1_MISO_GPIO IMX_GPIO_NR(5, 16)
+
+#define SPI_DELAY udelay(1)		/* ~500KHz cycle */
+#define SPI_READ gpio_get_value(SPI1_MISO_GPIO)
+#define SPI_SDA(value) gpio_set_value(SPI1_MOSI_GPIO, (value) != 0)
+#define SPI_SCL(value) gpio_set_value(SPI1_SCL_GPIO, (value) != 0)
 
 /* NAND stuff */
 #define CONFIG_MTD_DEBUG

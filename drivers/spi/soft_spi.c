@@ -10,6 +10,7 @@
 
 #include <common.h>
 #include <spi.h>
+#include <asm/gpio.h>
 
 #include <malloc.h>
 
@@ -126,8 +127,8 @@ int  spi_xfer(struct spi_slave *slave, unsigned int bitlen,
 	int		cpha = ss->mode & SPI_CPHA;
 	unsigned int	j;
 
-	PRINTD("spi_xfer: slave %u:%u dout %08X din %08X bitlen %u\n",
-		slave->bus, slave->cs, *(uint *)txd, *(uint *)rxd, bitlen);
+	PRINTD("spi_xfer: slave %u:%u.%u dout %08X din %08X bitlen %u\n",
+		slave->bus, slave->cs, ss->mode, *(uint *)txd, *(uint *)rxd, bitlen);
 
 	if (flags & SPI_XFER_BEGIN)
 		spi_cs_activate(slave);

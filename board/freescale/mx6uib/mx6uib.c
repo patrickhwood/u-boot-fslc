@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <asm/arch/sys_proto.h>
 #include <i2c.h>
+#include <spi.h>
 #include <power/pmic.h>
 #include <power/ltc3676_pmic.h>
 DECLARE_GLOBAL_DATA_PTR;
@@ -243,17 +244,17 @@ static struct i2c_pads_info i2c_pad_info3 = {
 	}
 };
 
-#ifdef CONFIG_MXC_SPI
+#ifdef CONFIG_SPI
 #define SPI_PAD_CTRL (PAD_CTL_HYS | PAD_CTL_SPEED_MED | \
 		      PAD_CTL_DSE_40ohm | PAD_CTL_SRE_FAST)
 
 iomux_v3_cfg_t const ecspi1_pads[] = {
-	MX6_PAD_DISP0_DAT20__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
-	MX6_PAD_DISP0_DAT21__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
-	MX6_PAD_DISP0_DAT22__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_DISP0_DAT20__GPIO5_IO14 | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_DISP0_DAT21__GPIO5_IO15 | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_DISP0_DAT22__GPIO5_IO16 | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	/* RFID CS */
 #	define RFID_CS IMX_GPIO_NR(5, 17)
-	MX6_PAD_DISP0_DAT23__ECSPI1_SS0 | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_DISP0_DAT23__GPIO5_IO17 | MUX_PAD_CTRL(SPI_PAD_CTRL),
 	/* RFID EN */
 #	define RFID_EN IMX_GPIO_NR(3, 30)
 	MX6_PAD_EIM_D30__GPIO3_IO30 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -281,13 +282,39 @@ static void setup_spi(void)
 
 	/* enable RFID */
 	gpio_direction_output(RFID_EN, 1);
+
+	/* Slave select is active low */
+	gpio_direction_output(RFID_CS, 1);
+	gpio_direction_output(SPI1_SCL_GPIO, 0);
+	gpio_direction_output(SPI1_MOSI_GPIO, 0);
+	gpio_direction_input(SPI1_MISO_GPIO);
 }
 
 int board_spi_cs_gpio(unsigned bus, unsigned cs)
 {
 	return -1;
 }
-#endif /* CONFIG_MXC_SPI */
+
+int spi_cs_is_valid(unsigned bus, unsigned cs)
+{
+	return (bus == 0 && cs == 0);
+}
+
+void spi_cs_activate(struct spi_slave *slave)
+{
+	SPI_DELAY;
+	gpio_set_value(RFID_CS, 0);
+	SPI_DELAY;
+}
+
+void spi_cs_deactivate(struct spi_slave *slave)
+{
+	SPI_DELAY;
+	gpio_set_value(RFID_CS, 1);
+	SPI_DELAY;
+}
+
+#endif /* CONFIG_SPI */
 
 iomux_v3_cfg_t const pcie_pads[] = {
 #	define PCIE_RESET_N_GPIO IMX_GPIO_NR(1, 0)
@@ -648,7 +675,7 @@ int board_init(void)
 	imx_iomux_v3_setup_multiple_pads(usb_pads, ARRAY_SIZE(usb_pads));
 #endif
 
-#ifdef CONFIG_MXC_SPI
+#ifdef CONFIG_SPI
 	setup_spi();
 #endif
 
